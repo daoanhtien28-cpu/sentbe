@@ -6,7 +6,15 @@ export type TransactionDocument = Transaction & Document;
 export enum TransactionStatus {
   SUCCESS = 'SUCCESS',
   PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum TransactionCategory {
+  DOMESTIC = 'DOMESTIC',       // Giao dịch trong nước
+  INTERNATIONAL = 'INTERNATIONAL', // Giao dịch quốc tế (chuyển tiền quốc tế)
 }
 
 @Schema({ timestamps: true, collection: 'transactions' })
@@ -22,11 +30,19 @@ export class Transaction {
   @Prop({ required: true, index: true })
   transferNumber: string; // Mã giao dịch (VD: 1128OTT260802051)
 
+  @Prop({
+    type: String,
+    default: TransactionCategory.DOMESTIC,
+    enum: TransactionCategory,
+    index: true,
+  })
+  category: TransactionCategory; // DOMESTIC (Nội địa) | INTERNATIONAL (Quốc tế)
+
   @Prop({ default: 'Sh 수협' })
-  transferChannel: string; // Kênh (Sh 수협)
+  transferChannel: string; // Kênh (Sh 수협, Sentbe...)
 
   @Prop({ default: '체크' })
-  transferTypeTag: string; // Tag hiển thị góc trên (VD: '체크' [Thẻ check], '이체' [Chuyển khoản], 'ATM')
+  transferTypeTag: string; // Tag hiển thị góc trên (VD: '체크' [Thẻ check], '이체' [Chuyển khoản], 'ATM', '해외송금' [Chuyển tiền quốc tế])
 
   @Prop({ required: true, trim: true, index: true })
   title: string; // Tên hiển thị to trên thẻ (VD: 자연애마트, 김환, GS25...)
@@ -46,23 +62,60 @@ export class Transaction {
   @Prop({ default: 0 })
   fee: number; // Phí giao dịch (VD: 0)
 
+  // --- Các trường dành cho quy đổi tiền tệ & chuyển tiền quốc tế ---
+  @Prop({ default: null })
+  exchangeRate?: number; // Tỷ giá quy đổi (VD: 1 KRW = 18.35 VND)
+
+  @Prop({ default: null, trim: true })
+  receiverCurrency?: string; // Đơn vị tiền tệ người nhận thực nhận (VD: 'VND', 'USD', 'PHP'...)
+
+  @Prop({ default: null })
+  receiveAmount?: number; // Số tiền đổi ra của người nhận (VD: 18,350,000)
+
+  @Prop({ default: null, trim: true })
+  receiverCountry?: string; // Mã quốc gia người nhận (VD: 'VN', 'PH', 'US')
+
+  @Prop({ default: null, trim: true })
+  deliveryMethod?: string; // Phương thức nhận tiền (VD: 'Ngân hàng/Chuyển nhanh', 'BANK_TRANSFER')
+
+  @Prop({ default: 0 })
+  finalAmount?: number; // Số tiền cuối cùng (transferAmount + fee, VD: 975000 KRW)
+
+  @Prop({ default: 'Rút tiền tự động', trim: true })
+  transferMethod?: string; // Phương thức chuyển (VD: 'Rút tiền tự động')
+
+  @Prop({ default: '', trim: true })
+  transferStatusDetail?: string; // Trạng thái chuyển tiền chi tiết (VD: 'Đã chuyển tiền (2026/09/11)')
+
+  @Prop({ default: '', trim: true })
+  receiverPhone?: string; // Số điện thoại người nhận (VD: '+84 335053104')
+
+  @Prop({ default: '', trim: true })
+  statusDisplay?: string; // Nhãn trạng thái hiển thị tiếng Việt (VD: 'Đang thực hiện', 'Hoàn thành')
+  // -------------------------------------------------------------
+
   @Prop({ default: 0 })
   balanceAfter: number; // Số dư còn lại sau giao dịch (잔액 VD: 2686)
 
   @Prop({ default: 0 })
   totalWithdrawalAmount: number; // Alias tương thích với UI cũ
 
-  @Prop({ default: TransactionStatus.SUCCESS, enum: TransactionStatus, index: true })
+  @Prop({
+    type: String,
+    default: TransactionStatus.SUCCESS,
+    enum: Object.values(TransactionStatus),
+    index: true,
+  })
   status: string;
 
-  // Ngân hàng nguồn (Payment Bank)
+  // Ngân hàng nguồn (Payment Bank / Rút tiền tự động)
   @Prop({ type: Object, default: {} })
   paymentBank: {
     bankCode?: string;
     name: string;
-    imageUrl: string;
+    imageUrl?: string;
     accountNumber: string;
-    accountName: string;
+    accountName?: string;
   };
 
   // Ngân hàng đích / Người nhận (Beneficiary Bank)
@@ -70,9 +123,10 @@ export class Transaction {
   beneficiaryBank: {
     bankCode?: string;
     name: string;
-    imageUrl: string;
+    imageUrl?: string;
     accountNumber: string;
     accountName: string;
+    phoneNumber?: string;
   };
 
   @Prop({ required: true, index: true })
@@ -99,4 +153,5 @@ TransactionSchema.set('toJSON', {
 
 TransactionSchema.index({ userId: 1, createdAt: -1 });
 TransactionSchema.index({ userId: 1, isDeposit: 1 });
+TransactionSchema.index({ userId: 1, category: 1 });
 TransactionSchema.index({ userId: 1, transferTime: -1 });

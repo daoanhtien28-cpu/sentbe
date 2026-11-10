@@ -35,6 +35,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack);
+      if (exception.name === 'ValidationError') {
+        status = HttpStatus.BAD_REQUEST;
+        message = exception.message;
+      } else {
+        message = exception.message || 'Lỗi máy chủ nội bộ';
+      }
     }
 
     response.status(status).json({

@@ -1,4 +1,4 @@
-# i_one_bank
+# sentbe
 
 ## NestJS Best Practices
 
@@ -182,5 +182,5 @@ These NestJS skills work with:
 - [AdaL](https://sylph.ai/adal) - Self-evolving AI coding agent with MCP support
 
 # convert_woori_be
-# i_one_bank
-# i_one_bank
+# sentbe
+# sentbe

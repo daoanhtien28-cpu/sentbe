@@ -62,6 +62,7 @@ export class RecentTransactionsService {
         imageUrl: bankDetails.imageUrl,
         accountName: dto.accountName.trim(),
         bankCode: bankDetails.bankCode,
+        phoneNumber: dto.phoneNumber !== undefined ? dto.phoneNumber.trim() : existing.phoneNumber,
       });
       return updated || existing;
     }
@@ -73,6 +74,7 @@ export class RecentTransactionsService {
       imageUrl: bankDetails.imageUrl,
       accountNumber: dto.accountNumber.trim(),
       accountName: dto.accountName.trim(),
+      phoneNumber: dto.phoneNumber?.trim() || '',
     });
   }
 
@@ -125,6 +127,7 @@ export class RecentTransactionsService {
     if (dto.imageUrl !== undefined) updateData.imageUrl = bankDetails.imageUrl;
     if (dto.accountNumber !== undefined) updateData.accountNumber = dto.accountNumber.trim();
     if (dto.accountName !== undefined) updateData.accountName = dto.accountName.trim();
+    if (dto.phoneNumber !== undefined) updateData.phoneNumber = dto.phoneNumber.trim();
 
     const updated = await this.recentTxRepo.update(id, updateData);
     if (!updated) {

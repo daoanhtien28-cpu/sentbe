@@ -1,21 +1,32 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
   Min,
 } from 'class-validator';
+import { TransactionCategory } from '../schemas/transaction.schema';
 
 export class CreateTransactionDto {
   @ApiProperty({ example: '자연애마트', description: 'Tên đơn vị / người nhận hiển thị to trên thẻ' })
   @IsString()
   title: string;
 
-  @ApiProperty({ example: 9470, description: 'Số tiền giao dịch (KRW)' })
+  @ApiProperty({ example: 9470, description: 'Số tiền giao dịch (tiền gửi nhập vào, VD KRW)' })
   @IsNumber()
   @Min(1)
   transferAmount: number;
+
+  @ApiPropertyOptional({
+    enum: TransactionCategory,
+    default: TransactionCategory.DOMESTIC,
+    description: 'Phân loại giao dịch: DOMESTIC (Trong nước) hoặc INTERNATIONAL (Quốc tế)',
+  })
+  @IsOptional()
+  @IsEnum(TransactionCategory)
+  category?: TransactionCategory;
 
   @ApiPropertyOptional({ example: false, default: false, description: 'false: 출금 (Tiền ra -), true: 입금 (Tiền vào +)' })
   @IsOptional()
@@ -57,7 +68,57 @@ export class CreateTransactionDto {
   @IsNumber()
   fee?: number;
 
-  @ApiPropertyOptional({ example: '2026.09.16', description: 'Ngày giao dịch (YYYY.MM.DD)' })
+  @ApiPropertyOptional({ example: 18.35, description: 'Tỷ giá quy đổi tiền tệ (VD: 1 KRW = 18.35 VND)' })
+  @IsOptional()
+  @IsNumber()
+  exchangeRate?: number;
+
+  @ApiPropertyOptional({ example: 'VND', description: 'Đơn vị tiền tệ người nhận thực nhận (VD: VND, USD, PHP)' })
+  @IsOptional()
+  @IsString()
+  receiverCurrency?: string;
+
+  @ApiPropertyOptional({ example: 18350000, description: 'Số tiền quy đổi người nhận thực nhận. Nếu để trống, server tự động tính: transferAmount * exchangeRate' })
+  @IsOptional()
+  @IsNumber()
+  receiveAmount?: number;
+
+  @ApiPropertyOptional({ example: '+84 335053104', description: 'Số điện thoại người nhận' })
+  @IsOptional()
+  @IsString()
+  receiverPhone?: string;
+
+  @ApiPropertyOptional({ example: 975000, description: 'Số tiền cuối cùng thanh toán (transferAmount + fee). Tự động tính nếu để trống' })
+  @IsOptional()
+  @IsNumber()
+  finalAmount?: number;
+
+  @ApiPropertyOptional({ example: 'Rút tiền tự động', default: 'Rút tiền tự động', description: 'Phương thức chuyển (VD: Rút tiền tự động, Chuyển khoản thủ công)' })
+  @IsOptional()
+  @IsString()
+  transferMethod?: string;
+
+  @ApiPropertyOptional({ example: 'Đã chuyển tiền (2026/09/11)', description: 'Trạng thái chuyển tiền chi tiết kèm ngày' })
+  @IsOptional()
+  @IsString()
+  transferStatusDetail?: string;
+
+  @ApiPropertyOptional({ example: 'Đang thực hiện', description: 'Tên trạng thái hiển thị tiếng Việt (VD: Đang thực hiện, Hoàn thành, Thất bại)' })
+  @IsOptional()
+  @IsString()
+  statusDisplay?: string;
+
+  @ApiPropertyOptional({ example: 'VN', description: 'Mã quốc gia người nhận (VD: VN, PH, US)' })
+  @IsOptional()
+  @IsString()
+  receiverCountry?: string;
+
+  @ApiPropertyOptional({ example: 'Ngân hàng/Chuyển nhanh', description: 'Phương thức nhận tiền (VD: Ngân hàng/Chuyển nhanh, BANK_TRANSFER)' })
+  @IsOptional()
+  @IsString()
+  deliveryMethod?: string;
+
+  @ApiPropertyOptional({ example: '2026.09.16', description: 'Ngày giao dịch (YYYY.MM.DD hoặc YYYY/MM/DD)' })
   @IsOptional()
   @IsString()
   transferTime?: string;
@@ -77,43 +138,63 @@ export class CreateTransactionDto {
   @IsString()
   transferTimeDetail?: string;
 
-  @ApiPropertyOptional({ example: '1128OTT260916001', description: 'Mã số giao dịch' })
+  @ApiPropertyOptional({ example: 'AE24518506135', description: 'Mã số giao dịch' })
   @IsOptional()
   @IsString()
   transferNumber?: string;
 
-  @ApiPropertyOptional({ example: 'Sh 수협', description: 'Kênh giao dịch' })
+  @ApiPropertyOptional({ example: 'Sentbe', description: 'Kênh giao dịch' })
   @IsOptional()
   @IsString()
   transferChannel?: string;
 
-  @ApiPropertyOptional({ example: 'SUCCESS', description: 'Trạng thái giao dịch (SUCCESS, PENDING, FAILED)' })
+  @ApiPropertyOptional({ example: 'PROCESSING', description: 'Mã trạng thái giao dịch (PROCESSING, SUCCESS, PENDING, FAILED)' })
   @IsOptional()
   @IsString()
   status?: string;
 
-  @ApiPropertyOptional({ example: 'KRW', description: 'Đơn vị tiền tệ' })
+  @ApiPropertyOptional({ example: 'KRW', description: 'Đơn vị tiền tệ người gửi' })
   @IsOptional()
   @IsString()
   currency?: string;
 
-  @ApiPropertyOptional({ description: 'Thông tin ngân hàng người gửi' })
+  @ApiPropertyOptional({
+    description: 'Thông tin tài khoản rút tiền / ngân hàng người gửi',
+    example: {
+      bankCode: 'NH',
+      name: '농협 (NH Bank)',
+      imageUrl: 'assets/images/bank/nonghyup_bank.png',
+      accountNumber: '3022130908031',
+      accountName: 'KIM SENTBE',
+    },
+  })
   @IsOptional()
   paymentBank?: {
     bankCode?: string;
     name: string;
-    imageUrl: string;
+    imageUrl?: string;
     accountNumber: string;
-    accountName: string;
+    accountName?: string;
   };
 
-  @ApiPropertyOptional({ description: 'Thông tin ngân hàng người nhận' })
+  @ApiPropertyOptional({
+    description: 'Thông tin người nhận / ngân hàng thụ hưởng',
+    example: {
+      bankCode: 'MB',
+      name: 'Ngân hàng MBBank',
+      imageUrl: 'assets/images/bank/bank_mb.png',
+      accountNumber: '9906052006',
+      accountName: 'Cuong Van Vu',
+      phoneNumber: '+84 335053104',
+    },
+  })
   @IsOptional()
   beneficiaryBank?: {
     bankCode?: string;
     name: string;
-    imageUrl: string;
+    imageUrl?: string;
     accountNumber: string;
     accountName: string;
+    phoneNumber?: string;
   };
 }

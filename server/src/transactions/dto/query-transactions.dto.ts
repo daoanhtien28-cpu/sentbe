@@ -19,7 +19,22 @@ export enum TransactionSearchType {
   MEMO = 'MEMO',             // 메모 (Nội dung / Ghi chú)
 }
 
+export enum TransactionCategoryFilter {
+  ALL = 'ALL',                     // Tất cả giao dịch
+  DOMESTIC = 'DOMESTIC',           // Giao dịch trong nước
+  INTERNATIONAL = 'INTERNATIONAL', // Giao dịch quốc tế (chuyển tiền quốc tế)
+}
+
 export class QueryTransactionsDto {
+  @ApiPropertyOptional({
+    enum: TransactionCategoryFilter,
+    default: TransactionCategoryFilter.ALL,
+    description: 'Phân loại giao dịch: ALL (tất cả), DOMESTIC (trong nước), INTERNATIONAL (quốc tế)',
+  })
+  @IsOptional()
+  @IsEnum(TransactionCategoryFilter)
+  category?: TransactionCategoryFilter = TransactionCategoryFilter.ALL;
+
   @ApiPropertyOptional({
     enum: TransactionTypeFilter,
     default: TransactionTypeFilter.ALL,

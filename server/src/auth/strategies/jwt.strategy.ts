@@ -8,6 +8,7 @@ export interface JwtPayload {
   sub: string;
   cardNumber?: string;
   email?: string;
+  phone?: string;
 }
 
 

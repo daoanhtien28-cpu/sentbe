@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 async function migrate() {
-  const uri = process.env.MONGODB_URI || 'mongodb+srv://daoanhtien232001_db_user:eYCok2j0bDvDMEs1@cluster0.nawgag3.mongodb.net';
+  const uri = process.env.MONGODB_URI || 'mongodb+srv://daoanhtien232001_db_user:emVFLDKp4dBkb4yE@cluster0.obcykjf.mongodb.net';
   await mongoose.connect(uri);
   console.log('Connected to MongoDB Atlas');
 

@@ -24,6 +24,9 @@ export class RecentTransaction {
 
   @Prop({ required: true, trim: true })
   accountName: string;
+
+  @Prop({ default: '', trim: true })
+  phoneNumber?: string; // Số điện thoại người nhận (cho giao dịch quốc tế / Sentbe)
 }
 
 export const RecentTransactionSchema = SchemaFactory.createForClass(RecentTransaction);

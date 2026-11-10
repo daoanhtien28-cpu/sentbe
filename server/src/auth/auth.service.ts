@@ -9,7 +9,7 @@ import { normalizePattern } from '../common/utils/pattern.util';
 import { UsersService } from '../users/users.service';
 import { WalletsService } from '../wallets/wallets.service';
 import { RegisterDto } from './dto/register.dto';
-import { User, UserDocument } from '../users/schemas/user.schema';
+import { UserDocument } from '../users/schemas/user.schema';
 
 export interface AuthTokens {
   accessToken: string;
@@ -57,12 +57,9 @@ export class AuthService {
     identifier: string,
     password: number[] | string,
   ): Promise<UserDocument> {
-    let user = await this.usersService.findByEmail(identifier);
+    const user = await this.usersService.findByIdentifier(identifier);
     if (!user) {
-      user = await this.usersService.findByCardNumber(identifier);
-    }
-    if (!user) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException('Email, số điện thoại hoặc mật khẩu không đúng');
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -70,14 +67,19 @@ export class AuthService {
       user.password,
     );
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException('Email, số điện thoại hoặc mật khẩu không đúng');
     }
 
     return user;
   }
 
   private async generateTokens(user: UserDocument): Promise<AuthTokens> {
-    const payload = { sub: user.id, email: user.email, cardNumber: user.cardNumber };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      phone: user.phone || user.phoneNumber,
+      cardNumber: user.cardNumber,
+    };
 
 
     // Access token: 30 days

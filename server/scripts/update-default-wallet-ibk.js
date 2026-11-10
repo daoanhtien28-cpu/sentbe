@@ -47,7 +47,7 @@ async function checkAndFix(uri, label) {
 }
 
 async function run() {
-  const devUri = 'mongodb+srv://daoanhtien232001_db_user:eYCok2j0bDvDMEs1@cluster0.nawgag3.mongodb.net';
+  const devUri = 'mongodb+srv://daoanhtien232001_db_user:emVFLDKp4dBkb4yE@cluster0.obcykjf.mongodb.net';
   const prodUri = 'mongodb+srv://daoanhtien232001_db_user:Tien230901@cluster0.1q69m5e.mongodb.net/?appName=Cluster0';
 
   try {

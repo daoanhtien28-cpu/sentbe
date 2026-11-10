@@ -10,12 +10,17 @@ import { WalletsService } from '../wallets/wallets.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import {
   QueryTransactionsDto,
+  TransactionCategoryFilter,
   TransactionSearchType,
   TransactionSortOrder,
   TransactionTypeFilter,
 } from './dto/query-transactions.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
-import { TransactionDocument, TransactionStatus } from './schemas/transaction.schema';
+import {
+  TransactionCategory,
+  TransactionDocument,
+  TransactionStatus,
+} from './schemas/transaction.schema';
 import { TransactionsRepository } from './transactions.repository';
 
 @Injectable()
@@ -38,14 +43,19 @@ export class TransactionsService {
       userId: new Types.ObjectId(userId),
     };
 
-    // 1. Lọc theo loại giao dịch (전체 / 입금 / 출금)
+    // 1. Phân loại giao dịch (Tất cả / Trong nước DOMESTIC / Quốc tế INTERNATIONAL)
+    if (query.category && query.category !== TransactionCategoryFilter.ALL) {
+      filter.category = query.category;
+    }
+
+    // 2. Lọc theo loại giao dịch (전체 / 입금 / 출금)
     if (query.type === TransactionTypeFilter.DEPOSIT) {
       filter.isDeposit = true;
     } else if (query.type === TransactionTypeFilter.WITHDRAWAL) {
       filter.isDeposit = false;
     }
 
-    // 2. Lọc theo thời gian thực tế của giao dịch (transferTime: YYYY.MM.DD)
+    // 3. Lọc theo thời gian thực tế của giao dịch (transferTime: YYYY.MM.DD)
     let startFilterTime: string | null = null;
     let endFilterTime: string | null = null;
 
@@ -181,9 +191,12 @@ export class TransactionsService {
     });
 
     // Xác định thông tin ngân hàng nhận
-    let receiverBankName = dto.receiverBankName || 'K bank';
-    let receiverImageUrl = 'assets/images/bank/bank_kbank.png';
-    let receiverBankCode = dto.receiverBankCode || 'KBANK';
+    const category = dto.category || TransactionCategory.DOMESTIC;
+    const isInternational = category === TransactionCategory.INTERNATIONAL;
+
+    let receiverBankName = dto.receiverBankName || (isInternational ? 'Ngân hàng MBBank' : 'K bank');
+    let receiverImageUrl = isInternational ? 'assets/images/bank/bank_mbbank.png' : 'assets/images/bank/bank_kbank.png';
+    let receiverBankCode = dto.receiverBankCode || (isInternational ? 'MB' : 'KBANK');
 
     if (dto.receiverBankCode) {
       try {
@@ -205,37 +218,121 @@ export class TransactionsService {
       ? (this.normalizeDateStr(dto.transferTime) || defaultDateStr)
       : defaultDateStr;
     const timeStr = dto.transferTimeDetail || defaultTimeStr;
-    const transferNumber = `1128OTT${Date.now().toString().slice(-9)}`;
+
+    // Sinh mã giao dịch chuẩn giao diện (Quốc tế dạng AE + 11 số ngẫu nhiên, VD: AE24518506135)
+    const randomSuffix = Math.floor(10000000000 + Math.random() * 90000000000).toString();
+    const defaultTxNumber = isInternational
+      ? `AE${randomSuffix}`
+      : `1128OTT${Date.now().toString().slice(-9)}`;
+    const transferNumber = dto.transferNumber || defaultTxNumber;
+
+    let exchangeRate = dto.exchangeRate;
+    let receiveAmount = dto.receiveAmount;
+    let receiverCurrency = dto.receiverCurrency;
+
+    if (isInternational) {
+      receiverCurrency = receiverCurrency || 'VND';
+      if (exchangeRate && !receiveAmount) {
+        // Tự động tính tiền đổi ra cho người nhận: tiền nhập * tỷ giá
+        receiveAmount = Math.round(dto.transferAmount * exchangeRate);
+      } else if (!exchangeRate && receiveAmount && dto.transferAmount > 0) {
+        // Tự động suy ra tỷ giá quy đổi
+        exchangeRate = Number((receiveAmount / dto.transferAmount).toFixed(6));
+      }
+    } else {
+      receiverCurrency = receiverCurrency || dto.currency || wallet.currency || 'KRW';
+      receiveAmount = receiveAmount ?? dto.transferAmount;
+      exchangeRate = exchangeRate ?? 1;
+    }
+
+    const statusStr = dto.status ? dto.status.toUpperCase() : TransactionStatus.SUCCESS;
+
+    // Map nhãn trạng thái hiển thị tiếng Việt
+    const defaultStatusDisplayMap: Record<string, string> = {
+      [TransactionStatus.PROCESSING]: 'Đang thực hiện',
+      [TransactionStatus.SUCCESS]: 'Hoàn thành',
+      [TransactionStatus.COMPLETED]: 'Hoàn thành',
+      [TransactionStatus.PENDING]: 'Đang chờ xử lý',
+      [TransactionStatus.FAILED]: 'Thất bại',
+      [TransactionStatus.CANCELLED]: 'Đã hủy',
+    };
+    const statusDisplay =
+      dto.statusDisplay || defaultStatusDisplayMap[statusStr] || 'Đang thực hiện';
+
+    const slashDate = dateStr.replace(/\./g, '/');
+    const transferStatusDetail =
+      dto.transferStatusDetail || `Đã chuyển tiền (${slashDate})`;
+
+    const transferMethod = dto.transferMethod || 'Rút tiền tự động';
+    const deliveryMethod =
+      dto.deliveryMethod || (isInternational ? 'Ngân hàng/Chuyển nhanh' : 'BANK_TRANSFER');
+
+    const receiverPhone =
+      dto.receiverPhone || dto.beneficiaryBank?.phoneNumber || (isInternational ? '+84 335053104' : '');
+
+    const finalAmount = dto.finalAmount ?? (dto.transferAmount + fee);
+
+    const defaultPaymentBank = {
+      bankCode: wallet.linkedBankCode || 'NH',
+      name: wallet.linkedBankName || '농협 (NH Bank)',
+      imageUrl: wallet.imageUrl || 'assets/images/bank/nonghyup_bank.png',
+      accountNumber: wallet.accountNumber || '3022130908031',
+      accountName: wallet.ownerName || 'KIM SENTBE',
+    };
+
+    const paymentBank = dto.paymentBank
+      ? {
+        ...defaultPaymentBank,
+        ...dto.paymentBank,
+      }
+      : defaultPaymentBank;
+
+    const defaultBeneficiaryBank = {
+      bankCode: receiverBankCode,
+      name: receiverBankName,
+      imageUrl: receiverImageUrl,
+      accountNumber:
+        dto.receiverAccountNumber || (isInternational ? '9906052006' : '9876 543 210'),
+      accountName: dto.receiverName || dto.title,
+      phoneNumber: receiverPhone,
+    };
+
+    const beneficiaryBank = dto.beneficiaryBank
+      ? {
+        ...defaultBeneficiaryBank,
+        ...dto.beneficiaryBank,
+        phoneNumber: dto.beneficiaryBank.phoneNumber || receiverPhone,
+      }
+      : defaultBeneficiaryBank;
 
     return this.transactionsRepo.save({
       userId: new Types.ObjectId(userId),
-      walletId: new Types.ObjectId(wallet.id),
-      transferNumber: dto.transferNumber || transferNumber,
-      transferChannel: dto.transferChannel || 'IBK',
-      transferTypeTag: dto.transferTypeTag || (isDeposit ? '입금' : '체크'),
+      walletId: (wallet as any)._id || new Types.ObjectId(wallet.id),
+      transferNumber,
+      category,
+      transferChannel: dto.transferChannel || (isInternational ? 'Sentbe' : 'IBK'),
+      transferTypeTag: dto.transferTypeTag || (isInternational ? (isDeposit ? '해외입금' : '해외송금') : (isDeposit ? '입금' : '체크')),
       title: dto.title,
       content: dto.content || '',
       isDeposit,
       currency: dto.currency || wallet.currency || 'KRW',
       transferAmount: dto.transferAmount,
       fee,
+      finalAmount,
+      transferMethod,
+      transferStatusDetail,
+      receiverPhone,
+      statusDisplay,
+      exchangeRate: exchangeRate ?? undefined,
+      receiverCurrency,
+      receiveAmount: receiveAmount ?? undefined,
+      receiverCountry: dto.receiverCountry || (isInternational ? 'VN' : 'KR'),
+      deliveryMethod,
       balanceAfter: dto.balanceAfter ?? newAvailableBalance,
       totalWithdrawalAmount: dto.totalWithdrawalAmount ?? (dto.balanceAfter ?? newAvailableBalance),
-      status: (dto.status as TransactionStatus) || TransactionStatus.SUCCESS,
-      paymentBank: dto.paymentBank || {
-        bankCode: wallet.linkedBankCode || 'IBK',
-        name: wallet.linkedBankName || 'IBK',
-        imageUrl: wallet.imageUrl || 'assets/images/bank/bank_ibk.png',
-        accountNumber: wallet.accountNumber,
-        accountName: wallet.ownerName,
-      },
-      beneficiaryBank: dto.beneficiaryBank || {
-        bankCode: receiverBankCode,
-        name: receiverBankName,
-        imageUrl: receiverImageUrl,
-        accountNumber: dto.receiverAccountNumber || '9876 543 210',
-        accountName: dto.receiverName || dto.title,
-      },
+      status: (statusStr as TransactionStatus) || TransactionStatus.SUCCESS,
+      paymentBank,
+      beneficiaryBank,
       transferTime: dateStr,
       transferTimeDetail: timeStr,
     });
@@ -285,40 +382,102 @@ export class TransactionsService {
         totalBalance: Math.max(0, wallet.totalBalance + delta),
       });
 
-      dto.balanceAfter = projectedBalance;
-      dto.totalWithdrawalAmount = projectedBalance;
+      dto.balanceAfter = dto.balanceAfter !== undefined ? dto.balanceAfter : projectedBalance;
+      dto.totalWithdrawalAmount = dto.totalWithdrawalAmount !== undefined ? dto.totalWithdrawalAmount : projectedBalance;
     }
 
-    // 2. Nếu đổi mã ngân hàng nhận receiverBankCode, tự động cập nhật beneficiaryBank
-    if (dto.receiverBankCode) {
-      try {
-        const bank = await this.banksService.getBankByCode(dto.receiverBankCode);
-        if (!dto.beneficiaryBank) {
-          dto.beneficiaryBank = {
-            bankCode: bank.code,
-            name: bank.name,
-            imageUrl: bank.imageUrl,
-            accountNumber:
-              dto.receiverAccountNumber ||
-              tx.beneficiaryBank?.accountNumber ||
-              '9876 543 210',
-            accountName:
-              dto.receiverName ||
-              dto.title ||
-              tx.beneficiaryBank?.accountName ||
-              tx.title,
-          };
-        } else {
+    // Hợp nhất dữ liệu paymentBank nếu có cập nhật
+    if (dto.paymentBank) {
+      dto.paymentBank = {
+        ...(tx.paymentBank || {}),
+        ...dto.paymentBank,
+      };
+    }
+
+    // 2. Nếu đổi mã ngân hàng nhận receiverBankCode hoặc các trường người nhận lẻ tẻ, tự động cập nhật beneficiaryBank
+    if (
+      dto.receiverBankCode ||
+      dto.receiverName ||
+      dto.receiverAccountNumber ||
+      dto.receiverBankName ||
+      dto.receiverPhone ||
+      dto.beneficiaryBank
+    ) {
+      dto.beneficiaryBank = {
+        ...(tx.beneficiaryBank || {}),
+        ...(dto.beneficiaryBank || {}),
+      };
+
+      if (dto.receiverBankCode) {
+        try {
+          const bank = await this.banksService.getBankByCode(dto.receiverBankCode);
           dto.beneficiaryBank.bankCode = bank.code;
           dto.beneficiaryBank.name = bank.name;
           dto.beneficiaryBank.imageUrl = bank.imageUrl;
-        }
-      } catch (_) { }
+        } catch (_) { }
+      }
+
+      if (dto.receiverBankName) dto.beneficiaryBank.name = dto.receiverBankName;
+      if (dto.receiverAccountNumber) dto.beneficiaryBank.accountNumber = dto.receiverAccountNumber;
+      if (dto.receiverName) dto.beneficiaryBank.accountName = dto.receiverName;
+      if (dto.receiverPhone) dto.beneficiaryBank.phoneNumber = dto.receiverPhone;
     }
 
     // Chuẩn hóa định dạng ngày nếu người dùng chỉnh sửa transferTime
     if (dto.transferTime) {
       dto.transferTime = this.normalizeDateStr(dto.transferTime) || dto.transferTime;
+      if (!dto.transferStatusDetail) {
+        dto.transferStatusDetail = `Đã chuyển tiền (${dto.transferTime.replace(/\./g, '/')})`;
+      }
+    }
+
+    // Tự động tính lại số tiền cuối cùng (finalAmount = transferAmount + fee) nếu có thay đổi
+    if (dto.transferAmount !== undefined || dto.fee !== undefined) {
+      if (dto.finalAmount === undefined) {
+        const effectiveAmount = dto.transferAmount ?? tx.transferAmount;
+        const effectiveFee = dto.fee !== undefined ? dto.fee : (tx.fee || 0);
+        dto.finalAmount = effectiveAmount + effectiveFee;
+      }
+    }
+
+    // Tự động map statusDisplay nếu cập nhật status
+    if (dto.status && !dto.statusDisplay) {
+      const defaultStatusDisplayMap: Record<string, string> = {
+        [TransactionStatus.PROCESSING]: 'Đang thực hiện',
+        [TransactionStatus.SUCCESS]: 'Hoàn thành',
+        [TransactionStatus.COMPLETED]: 'Hoàn thành',
+        [TransactionStatus.PENDING]: 'Đang chờ xử lý',
+        [TransactionStatus.FAILED]: 'Thất bại',
+        [TransactionStatus.CANCELLED]: 'Đã hủy',
+      };
+      dto.statusDisplay = defaultStatusDisplayMap[dto.status.toUpperCase()] || tx.statusDisplay;
+    }
+
+    // Đồng bộ số điện thoại người nhận
+    if (dto.receiverPhone || dto.beneficiaryBank?.phoneNumber) {
+      const phone = dto.receiverPhone || dto.beneficiaryBank?.phoneNumber;
+      dto.receiverPhone = phone;
+      if (dto.beneficiaryBank) {
+        dto.beneficiaryBank.phoneNumber = phone;
+      }
+    }
+
+    // Tự động tính toán lại tỷ giá hoặc tiền nhận nếu có thay đổi liên quan đến giao dịch quốc tế
+    const effectiveCategory = dto.category ?? tx.category ?? TransactionCategory.DOMESTIC;
+    if (effectiveCategory === TransactionCategory.INTERNATIONAL) {
+      const effectiveAmount = dto.transferAmount ?? tx.transferAmount;
+      if (dto.exchangeRate !== undefined && dto.receiveAmount === undefined) {
+        dto.receiveAmount = Math.round(effectiveAmount * dto.exchangeRate);
+      } else if (dto.receiveAmount !== undefined && dto.exchangeRate === undefined && effectiveAmount > 0) {
+        dto.exchangeRate = Number((dto.receiveAmount / effectiveAmount).toFixed(6));
+      } else if (
+        dto.transferAmount !== undefined &&
+        dto.exchangeRate === undefined &&
+        dto.receiveAmount === undefined &&
+        tx.exchangeRate
+      ) {
+        dto.receiveAmount = Math.round(dto.transferAmount * tx.exchangeRate);
+      }
     }
 
     // 3. Cập nhật tất cả thông tin vào database

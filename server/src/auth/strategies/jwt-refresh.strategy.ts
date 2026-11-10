@@ -10,6 +10,7 @@ export interface JwtRefreshPayload {
   sub: string;
   cardNumber?: string;
   email?: string;
+  phone?: string;
 }
 
 

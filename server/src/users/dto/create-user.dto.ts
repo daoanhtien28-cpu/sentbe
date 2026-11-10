@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -8,10 +7,45 @@ import {
 } from 'class-validator';
 
 export class CreateUserDto {
-  @ApiProperty({ example: 'user@example.com', description: 'Email người dùng' })
-  @IsNotEmpty({ message: 'Email không được để trống' })
-  @IsEmail({}, { message: 'Email không hợp lệ' })
-  email: string;
+  @ApiPropertyOptional({
+    example: 'user@example.com',
+    description: 'Email người dùng (cần email hoặc số điện thoại)',
+  })
+  @IsOptional()
+  @IsString({ message: 'Email phải là chuỗi ký tự' })
+  email?: string;
+
+  @ApiPropertyOptional({
+    example: '0987654321',
+    description: 'Số điện thoại người dùng (sdt)',
+  })
+  @IsOptional()
+  @IsString({ message: 'Số điện thoại phải là chuỗi ký tự' })
+  sdt?: string;
+
+  @ApiPropertyOptional({
+    example: '0987654321',
+    description: 'Số điện thoại người dùng (phone)',
+  })
+  @IsOptional()
+  @IsString({ message: 'Số điện thoại phải là chuỗi ký tự' })
+  phone?: string;
+
+  @ApiPropertyOptional({
+    example: '0987654321',
+    description: 'Số điện thoại người dùng (phoneNumber)',
+  })
+  @IsOptional()
+  @IsString({ message: 'Số điện thoại phải là chuỗi ký tự' })
+  phoneNumber?: string;
+
+  @ApiPropertyOptional({
+    example: 'user@example.com hoặc 0987654321',
+    description: 'Định danh (email hoặc số điện thoại)',
+  })
+  @IsOptional()
+  @IsString({ message: 'Định danh phải là chuỗi ký tự' })
+  identifier?: string;
 
   @ApiProperty({
     example: '123456',
@@ -22,10 +56,13 @@ export class CreateUserDto {
   @Matches(/^[0-9]{6}$/, { message: 'Mật khẩu phải gồm đúng 6 chữ số' })
   password: string;
 
-  @ApiProperty({ example: 'DAO ANH TIEN', description: 'Họ và tên người dùng' })
-  @IsNotEmpty({ message: 'Họ và tên không được để trống' })
+  @ApiPropertyOptional({
+    example: 'DAO ANH TIEN',
+    description: 'Họ và tên người dùng (tùy chọn, mặc định: DAO ANH TIEN)',
+  })
+  @IsOptional()
   @IsString({ message: 'Họ và tên phải là chuỗi ký tự' })
-  fullName: string;
+  fullName?: string;
 
   @ApiPropertyOptional({ example: '9704123456789012', description: 'Số thẻ ngân hàng (tùy chọn)' })
   @IsOptional()

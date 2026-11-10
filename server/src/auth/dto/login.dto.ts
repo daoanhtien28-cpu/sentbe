@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
-  IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -8,10 +7,45 @@ import {
 } from "class-validator";
 
 export class LoginDto {
-  @ApiProperty({ example: "user@example.com", description: "Email đăng nhập" })
-  @IsNotEmpty({ message: "Email không được để trống" })
-  @IsEmail({}, { message: "Email không hợp lệ" })
-  email: string;
+  @ApiPropertyOptional({
+    example: "user@example.com hoặc 0987654321",
+    description: "Email hoặc số điện thoại đăng nhập",
+  })
+  @IsOptional()
+  @IsString({ message: "Email phải là chuỗi ký tự" })
+  email?: string;
+
+  @ApiPropertyOptional({
+    example: "0987654321",
+    description: "Số điện thoại đăng nhập (sdt)",
+  })
+  @IsOptional()
+  @IsString({ message: "Số điện thoại phải là chuỗi ký tự" })
+  sdt?: string;
+
+  @ApiPropertyOptional({
+    example: "0987654321",
+    description: "Số điện thoại đăng nhập (phone)",
+  })
+  @IsOptional()
+  @IsString({ message: "Số điện thoại phải là chuỗi ký tự" })
+  phone?: string;
+
+  @ApiPropertyOptional({
+    example: "0987654321",
+    description: "Số điện thoại đăng nhập (alias của phone)",
+  })
+  @IsOptional()
+  @IsString({ message: "Số điện thoại phải là chuỗi ký tự" })
+  phoneNumber?: string;
+
+  @ApiPropertyOptional({
+    example: "user@example.com hoặc 0987654321",
+    description: "Định danh đăng nhập (email hoặc số điện thoại)",
+  })
+  @IsOptional()
+  @IsString({ message: "Định danh phải là chuỗi ký tự" })
+  identifier?: string;
 
   @ApiProperty({
     example: "123456",

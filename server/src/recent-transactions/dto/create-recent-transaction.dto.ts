@@ -41,4 +41,12 @@ export class CreateRecentTransactionDto {
   @IsNotEmpty({ message: 'Tên người nhận (accountName) không được để trống' })
   @IsString()
   accountName: string;
+
+  @ApiPropertyOptional({
+    example: '+84 335053104',
+    description: 'Số điện thoại người nhận (cho giao dịch quốc tế / Sentbe)',
+  })
+  @IsOptional()
+  @IsString()
+  phoneNumber?: string;
 }

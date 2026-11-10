@@ -20,29 +20,62 @@
 
 ### 2.1. Đăng ký tài khoản (`POST /api/auth/register`)
 
-Tạo tài khoản người dùng mới bằng Email, Mật khẩu và Tên. Tự động cấp cặp token, đồng thời **tự động khởi tạo luôn ví mặc định** cho tài khoản. Ví mặc định lấy thông tin **NH Bank** từ danh mục ngân hàng: `linkedBankCode`, `linkedBankName` và `imageUrl` tương ứng với ngân hàng mã `NH` (tên mặc định `NH Bank`).
+Tạo tài khoản người dùng mới chỉ cần **3 thông tin**: `email`, `sdt` (số điện thoại) và `password`. Tự động cấp cặp token, đồng thời **tự động khởi tạo luôn ví mặc định** cho tài khoản. Ví mặc định lấy thông tin **NH Bank** từ danh mục ngân hàng: `linkedBankCode`, `linkedBankName` và `imageUrl` tương ứng với ngân hàng mã `NH` (tên mặc định `NH Bank`).
 
-> **Lưu ý:** Đăng ký chỉ cần `email`, `password` và `fullName` (Tên). Trường `cardNumber` là tùy chọn (nếu không truyền, hệ thống sẽ tự động sinh số thẻ ngẫu nhiên).
+> **Lưu ý:**
+> - **Chỉ cần 3 thông tin cơ bản:** `email`, `sdt` (hoặc `phone`), và `password`.
+> - Trường `fullName` là **tùy chọn** (nếu không truyền, hệ thống sẽ tự động gán tên mặc định là `"DAO ANH TIEN"`).
+> - Trường `cardNumber` là tùy chọn (nếu không truyền, hệ thống sẽ tự động sinh số thẻ ngẫu nhiên).
+> - Hệ thống hỗ trợ truyền số điện thoại qua `sdt`, `phone`, hoặc `phoneNumber`.
+> - Ngoài ra, hệ thống cũng cho phép đăng ký linh hoạt chỉ với `email` + `password`, hoặc chỉ với `sdt` + `password`.
 
 * **Endpoint:** `/api/auth/register`
 * **Method:** `POST`
 * **Headers:** `Content-Type: application/json`
 
-#### Request Body
+#### Request Body Chuẩn (3 thông tin: email, sdt, password)
 ```json
 {
   "email": "user@example.com",
-  "password": "123456",
-  "fullName": "DAO ANH TIEN"
+  "sdt": "0987654321",
+  "password": "123456"
 }
 ```
 
+#### Request Body (Các biến thể hợp lệ khác)
+* **Chỉ Email + Password:**
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "123456"
+  }
+  ```
+* **Chỉ SĐT + Password:**
+  ```json
+  {
+    "sdt": "0987654321",
+    "password": "123456"
+  }
+  ```
+* *(Tùy chọn) Kèm Họ và Tên:*
+  ```json
+  {
+    "email": "user@example.com",
+    "sdt": "0987654321",
+    "password": "123456",
+    "fullName": "NGUYEN VAN A"
+  }
+  ```
+
 | Trường | Kiểu | Bắt buộc | Mô tả |
 | :--- | :--- | :--- | :--- |
-| `email` | `string` | **Có** | Email đăng ký (dùng để đăng nhập) |
+| `email` | `string` | Tùy chọn* | Email người dùng |
+| `sdt` | `string` | Tùy chọn* | Số điện thoại người dùng (có thể dùng `sdt`, `phone`, `phoneNumber`) |
 | `password` | `string` | **Có** | Mật khẩu (đúng 6 chữ số) |
-| `fullName` | `string` | **Có** | Họ tên người dùng |
+| `fullName` | `string` | Không | Họ tên người dùng (tùy chọn, mặc định: `"DAO ANH TIEN"`) |
 | `cardNumber` | `string` | Không | Số thẻ ngân hàng (tùy chọn, hệ thống tự động sinh nếu không truyền) |
+
+*\* Lưu ý: Cung cấp cả email và sdt (hoặc ít nhất 1 trong 2).*
 
 #### Response Thành Công (`201 Created`)
 ```json
@@ -58,19 +91,17 @@ Tạo tài khoản người dùng mới bằng Email, Mật khẩu và Tên. T�
 ```
 
 #### Response Thất Bại
-* **`400 Bad Request`**: Dữ liệu gửi lên không đúng định dạng hoặc không thỏa mãn yêu cầu mật khẩu:
+* **`400 Bad Request`**: Dữ liệu gửi lên không đúng định dạng hoặc thiếu cả email lẫn số điện thoại:
   ```json
   {
     "success": false,
     "statusCode": 400,
-    "message": [
-      "Mật khẩu phải gồm đúng 6 chữ số"
-    ],
+    "message": "Vui lòng cung cấp email hoặc số điện thoại để đăng ký",
     "timestamp": "2026-09-17T02:36:00.000Z",
     "path": "/api/auth/register"
   }
   ```
-* **`409 Conflict`**: Email đã được đăng ký:
+* **`409 Conflict`**: Email hoặc Số điện thoại đã được đăng ký:
   ```json
   {
     "success": false,
@@ -80,18 +111,19 @@ Tạo tài khoản người dùng mới bằng Email, Mật khẩu và Tên. T�
     "path": "/api/auth/register"
   }
   ```
+  *(hoặc `"message": "Số điện thoại đã được sử dụng"`)*
 
 ---
 
 ### 2.2. Đăng nhập (`POST /api/auth/login`)
 
-Xác thực bằng **Email** và **Mật khẩu** để nhận Token.
+Xác thực bằng **Email** hoặc **Số điện thoại** (hoặc Số thẻ) và **Mật khẩu** để nhận Token.
 
 * **Endpoint:** `/api/auth/login`
 * **Method:** `POST`
 * **Headers:** `Content-Type: application/json`
 
-#### Request Body
+#### Request Body (Ví dụ 1: Đăng nhập bằng Email)
 ```json
 {
   "email": "user@example.com",
@@ -99,11 +131,25 @@ Xác thực bằng **Email** và **Mật khẩu** để nhận Token.
 }
 ```
 
+#### Request Body (Ví dụ 2: Đăng nhập bằng Số điện thoại)
+```json
+{
+  "phone": "0987654321",
+  "password": "123456"
+}
+```
+*(Nếu FE gửi số điện thoại qua trường `email`: `{"email": "0987654321", "password": "123456"}` hoặc `identifier`: hệ thống vẫn nhận diện và đăng nhập thành công)*
+
 | Trường | Kiểu | Bắt buộc | Mô tả |
 | :--- | :--- | :--- | :--- |
-| `email` | `string` | **Có** | Email tài khoản đã đăng ký |
+| `email` | `string` | Tùy chọn* | Email tài khoản (hoặc SĐT nếu FE gửi vào trường này) |
+| `phone` | `string` | Tùy chọn* | Số điện thoại tài khoản |
+| `phoneNumber` | `string` | Tùy chọn | Alias của `phone` |
+| `identifier` | `string` | Tùy chọn* | Email hoặc Số điện thoại |
+| `cardNumber` | `string` | Tùy chọn* | Số thẻ ngân hàng đã liên kết |
 | `password` | `string` | **Có** | Mật khẩu (đúng 6 chữ số) |
-| `cardNumber` | `string` | Không | Số thẻ ngân hàng (hỗ trợ tùy chọn) |
+
+*\* Cần truyền ít nhất một trong các trường định danh (`email`, `phone`, `phoneNumber`, `identifier`, `cardNumber`).*
 
 #### Response Thành Công (`200 OK`)
 ```json
@@ -119,13 +165,22 @@ Xác thực bằng **Email** và **Mật khẩu** để nhận Token.
 ```
 
 #### Response Thất Bại
-* **`400 Bad Request`**: Mật khẩu không đúng định dạng 6 chữ số; thông báo: `"Mật khẩu phải gồm đúng 6 chữ số"`.
-* **`401 Unauthorized`**: Sai email hoặc sai mật khẩu:
+* **`400 Bad Request`**: Mật khẩu không đúng định dạng 6 chữ số hoặc thiếu thông tin đăng nhập:
+  ```json
+  {
+    "success": false,
+    "statusCode": 400,
+    "message": "Vui lòng cung cấp email hoặc số điện thoại để đăng nhập",
+    "timestamp": "2026-09-17T02:36:20.000Z",
+    "path": "/api/auth/login"
+  }
+  ```
+* **`401 Unauthorized`**: Sai thông tin tài khoản hoặc sai mật khẩu:
   ```json
   {
     "success": false,
     "statusCode": 401,
-    "message": "Email hoặc mật khẩu không đúng",
+    "message": "Email, số điện thoại hoặc mật khẩu không đúng",
     "timestamp": "2026-09-17T02:36:34.338Z",
     "path": "/api/auth/login"
   }
@@ -149,6 +204,8 @@ Xác thực bằng **Email** và **Mật khẩu** để nhận Token.
     "id": "6aaef99de099f80722ad6e0",
     "cardNumber": "9704123456789012",
     "email": "user@example.com",
+    "phone": "0987654321",
+    "phoneNumber": "0987654321",
     "fullName": "Nguyễn Văn A",
     "isActive": true,
     "createdAt": "2026-09-17T02:35:53.997Z",

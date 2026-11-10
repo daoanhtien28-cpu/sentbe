@@ -10,8 +10,17 @@ export class User {
   @Prop({ unique: true, sparse: true })
   cardNumber?: string;
 
-  @Prop({ unique: true, required: true, lowercase: true, trim: true, sparse: true })
-  email: string;
+  @Prop({ unique: true, sparse: true, lowercase: true, trim: true })
+  email?: string;
+
+  @Prop({ unique: true, sparse: true, trim: true })
+  phone?: string;
+
+  @Prop({ unique: true, sparse: true, trim: true })
+  phoneNumber?: string;
+
+  @Prop({ unique: true, sparse: true, trim: true })
+  sdt?: string;
 
   @Prop({ required: true })
   password: string;
@@ -41,6 +50,14 @@ UserSchema.set('toJSON', {
     delete (ret as any).__v;
     delete (ret as any).password;
     delete (ret as any).refreshToken;
+
+    const phoneVal = (ret as any).phone || (ret as any).phoneNumber || (ret as any).sdt;
+    if (phoneVal) {
+      (ret as any).phone = phoneVal;
+      (ret as any).phoneNumber = phoneVal;
+      (ret as any).sdt = phoneVal;
+    }
+
     return ret;
   },
 });

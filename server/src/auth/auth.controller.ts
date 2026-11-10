@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -14,7 +15,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { User, UserDocument } from '../users/schemas/user.schema';
+import { UserDocument } from '../users/schemas/user.schema';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -28,21 +29,34 @@ export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
   @Post('register')
-  @ApiOperation({ summary: 'Đăng ký tài khoản mới' })
+  @ApiOperation({ summary: 'Đăng ký tài khoản mới bằng email hoặc số điện thoại' })
   @ApiResponse({ status: 201, description: 'Đăng ký thành công, trả về tokens' })
-  @ApiResponse({ status: 409, description: 'Email đã tồn tại' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ hoặc thiếu email/số điện thoại' })
+  @ApiResponse({ status: 409, description: 'Email hoặc số điện thoại đã tồn tại' })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Đăng nhập bằng email và mật khẩu' })
+  @ApiOperation({ summary: 'Đăng nhập bằng email hoặc số điện thoại và mật khẩu' })
   @ApiResponse({ status: 200, description: 'Đăng nhập thành công, trả về tokens' })
-  @ApiResponse({ status: 401, description: 'Email hoặc mật khẩu không đúng' })
+  @ApiResponse({ status: 400, description: 'Thiếu thông tin đăng nhập hoặc mật khẩu không đúng định dạng' })
+  @ApiResponse({ status: 401, description: 'Email/số điện thoại hoặc mật khẩu không đúng' })
   async login(@Body() dto: LoginDto) {
-    const identifier = dto.email || dto.cardNumber || "";
-    const user = await this.authService.validateUser(identifier, dto.password);
+    const rawIdentifier =
+      dto.identifier ||
+      dto.sdt ||
+      dto.phone ||
+      dto.phoneNumber ||
+      dto.email ||
+      dto.cardNumber;
+
+    if (!rawIdentifier || !rawIdentifier.trim()) {
+      throw new BadRequestException('Vui lòng cung cấp email hoặc số điện thoại để đăng nhập');
+    }
+
+    const user = await this.authService.validateUser(rawIdentifier.trim(), dto.password);
     return this.authService.login(user);
   }
 
